@@ -35,7 +35,7 @@ from multiprocessing import Pool
 from functools import partial
 
 # disable multiprocessing and possibly print more verbose output
-DEBUG = False
+DEBUG = True
 PROCESSES = 12
 
 ########################################################################################################################
@@ -168,7 +168,7 @@ def get_stmt_counts(data_set, data_list):
 
 def data_statistics(data, descr):
     """
-    Compute and print some statistics on the data
+    Compute and print some statistics on the data 打印统计信息
     :param data: list of lists of statements (strings)
     :param descr: string description of the current step of the pipeline to add to output
     :return: source_data_list: list of statements
@@ -511,7 +511,7 @@ def get_functions_declared_in_files(data):
     return functions_declared_in_files
 
 
-def keep(line):
+def keep(line): # 输入一行代码，决定是否参与训练
     """
     Determine whether a line of code is representative
     and should be kept in the data set or not.
@@ -572,7 +572,7 @@ def keep(line):
     return True
 
 
-def remove_non_representative_code(data):
+def remove_non_representative_code(data): #删除无LLVM语法和嵌入中不使用的行
     """
     Remove lines of code that aren't representative of LLVM-IR "language"
     and shouldn't be used for training the embeddings
@@ -586,7 +586,7 @@ def remove_non_representative_code(data):
     return data
 
 
-def remove_leading_spaces(data):
+def remove_leading_spaces(data):    # 删除代码行的缩进
     """
     Remove the leading spaces (indentation) of lines of code
     :param data: input data as a list of files, where each file is a list of strings
@@ -600,7 +600,7 @@ def remove_leading_spaces(data):
     return data
 
 
-def remove_trailing_comments_and_metadata(data):
+def remove_trailing_comments_and_metadata(data):    # 删除一行末尾的注释、元数据和属性组
     """
     Remove comments, metadata and attribute groups trailing at the end of a line
     :param data: input data as a list of files where each file is a list of strings
@@ -654,7 +654,7 @@ def remove_trailing_comments_and_metadata(data):
     return data
 
 
-def collapse_stmt_units_to_a_line(data):
+def collapse_stmt_units_to_a_line(data):    # 检测并折叠 同一语句写多行 的情况
     """
     Some statements are written on several lines though they really are just one statement
     Detect and collapse these
@@ -715,7 +715,7 @@ def collapse_stmt_units_to_a_line(data):
     return data
 
 
-def remove_structure_definitions(data):
+def remove_structure_definitions(data): # 删除不代表LLVM-IR语言且不应用于训练嵌入的代码行
     """
     Remove lines of code that aren't representative of LLVM-IR "language"
     and shouldn't be used for training the embeddings
@@ -739,13 +739,13 @@ def preprocess(data):
     :return: preprocessed_data: modified input data
              functions_declared_in_files:
     """
-    functions_declared_in_files = get_functions_declared_in_files(data)
-    data = remove_non_representative_code(data)
-    data = remove_leading_spaces(data)
-    data = remove_trailing_comments_and_metadata(data)
-    data = collapse_stmt_units_to_a_line(data)
+    functions_declared_in_files = get_functions_declared_in_files(data)  # 获取函数名列表
+    data = remove_non_representative_code(data)  # 去除训练无关语句
+    data = remove_leading_spaces(data)  #去除代码缩进
+    data = remove_trailing_comments_and_metadata(data)  # 删除一行末尾的注释、元数据和属性组
+    data = collapse_stmt_units_to_a_line(data)  # 检测并折叠 同一语句写多行 的情况
     preprocessed_data = copy.deepcopy(data)
-    preprocessed_data = remove_structure_definitions(preprocessed_data)
+    preprocessed_data = remove_structure_definitions(preprocessed_data) # 删除不代表LLVM-IR语言且不应用于训练嵌入的代码行
 
     return preprocessed_data, functions_declared_in_files
 
@@ -761,7 +761,7 @@ def get_identifiers_from_line(line):
     """
     # Find label nodes
     m_label = m_label2 = list()
-    if line.find('label') is not -1 or re.match(rgx.local_id_no_perc + r':', line):
+    if line.find('label') != -1 or re.match(rgx.local_id_no_perc + r':', line):
         m_label1 = re.findall('label (' + rgx.local_id + ')', line)
         if re.match(r'; <label>:' + rgx.local_id_no_perc + ':\s+', line):
             m_label2 = re.findall('<label>:(' + rgx.local_id_no_perc + '):', line)
@@ -896,7 +896,7 @@ def get_num_args_func(line, func_name=None):
     return num_args, arg_list
 
 
-def construct_function_dictionary(file):
+def construct_function_dictionary(file):    # 构建一个用于帮助构建上下文图的函数字典
     """
     Construct a dictionary of functions which will be used to aid the construction of the context-graph
     :param file: list of statements
@@ -1006,7 +1006,7 @@ def construct_function_dictionary(file):
 
         # If it's a return statement
         elif re.match(r'ret .*', line):
-            if func_name is not '':
+            if func_name != '':
                 # add the return statement to the dictionary
                 functions_defined_in_file[func_name][2] = line
                 func_name = ''
@@ -1035,7 +1035,7 @@ def construct_function_dictionary(file):
     # Make sure all function names have a corresponding return identifier
     for k, v in functions_defined_in_file_DEF.items():
         if k != 'main':
-            if v[2] is 'no_return':
+            if v[2] == 'no_return':
                 print('WARNING! Function', k, 'has no corresponding return statement')
 
     return functions_defined_in_file_DEF
@@ -1294,8 +1294,8 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
         elif re.match(rgx.start_basic_block, line):
             # eg ; <label>:11:                                     ; preds = %8
             # eg .lr.ph.i:
-            assert block_ref is not '', "Empty block reference at line:\n" + line
-            assert func_prefix is not '', "Empty function prefix at line:\n" + line
+            assert block_ref != '', "Empty block reference at line:\n" + line
+            assert func_prefix != '', "Empty function prefix at line:\n" + line
             if all_degrees(G, block_ref) == 0:
                 G.remove_node(block_ref)    # if the previous block reference has not been used, delete it
 
@@ -2171,7 +2171,7 @@ def check_graph_construction(G, filename):
     return multi_edges, G
 
 
-def build_graph(file, functions_declared_in_file, filename):
+def build_graph(file, functions_declared_in_file, filename):    #给定一个源代码文件，构造一个上下文图 这个函数对每个文件调用一次
     """
     Given a file of source code, construct a context graph
     This function is called once for each file
@@ -2699,7 +2699,7 @@ def check_sanity(D, G):
     :param G: base graph
     """
     isolated_nodes = [n for n in D.nodes() if D.degree(n) == 0]
-    if len(isolated_nodes) is not 0:
+    if len(isolated_nodes) != 0:
         print("WARNING! Isolated nodes found in D-graph")
         for n in isolated_nodes:
             D.remove_node(n)
@@ -2773,14 +2773,14 @@ def construct_xfg_single_raw_folder(params, num_folder):
 
             # Source code transformation: simple pre-processing
             print('\n--- Pre-process code')
-            preprocessed_data, functions_declared_in_files = preprocess(raw_data)
+            preprocessed_data, functions_declared_in_files = preprocess(raw_data)   # 预处理
             preprocessed_data_with_structure_def = raw_data
             # save the vocabulary for later checks
-            vocabulary_after_preprocessing = list(set(collapse_into_one_list(preprocessed_data)))
+            vocabulary_after_preprocessing = list(set(collapse_into_one_list(preprocessed_data)))   # 预处理后形成词汇库
 
             # Dump pre-processed data into a folder to be reused
             print('Writing pre-processed data into folder ', folder_preprocessed, '/')
-            print_preprocessed_data(preprocessed_data, folder_preprocessed, file_names)
+            print_preprocessed_data(preprocessed_data, folder_preprocessed, file_names) #预处理代码写入文件
             print('Dumping pre-processed data info file ', data_preprocessed_filename)
             i2v_utils.safe_pickle([preprocessed_data, functions_declared_in_files,
                                     preprocessed_data_with_structure_def, vocabulary_after_preprocessing],
@@ -2795,7 +2795,7 @@ def construct_xfg_single_raw_folder(params, num_folder):
                     preprocessed_data_with_structure_def, vocabulary_after_preprocessing = pickle.load(f)
 
         # Print statistics and release memory
-        source_data_list, source_data = data_statistics(preprocessed_data, descr="pre-processing code")
+        source_data_list, source_data = data_statistics(preprocessed_data, descr="pre-processing code") # 静态分析/预处理
         del source_data_list
 
         # Make sure folders exist

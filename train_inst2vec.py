@@ -36,6 +36,8 @@ from absl import flags, app
 FLAGS = flags.FLAGS
 
 
+
+
 def main(argv):
     del argv  # unused
 
@@ -45,7 +47,9 @@ def main(argv):
         if FLAGS.data == "data" and len(os.listdir(data_folder)) <= 1:
             # Generate the data set
             print('Folder', data_folder, 'is empty - preparing to download training data')
-            i2v_datagen.datagen(data_folder)
+            i2v_datagen.datagen(data_folder)    # 下载数据集
+        elif FLAGS.data == "data" and len(os.listdir(data_folder)) <= 12:
+            i2v_datagen.unzipdata(data_folder)
         else:
             # Assert the data folder's existence
             assert os.path.exists(data_folder), "Folder " + data_folder + " does not exist"

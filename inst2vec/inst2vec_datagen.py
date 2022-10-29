@@ -28,6 +28,24 @@ import os
 import shutil
 
 
+#############################################################
+# 解压数据集
+################################################################
+def unzipdata(data_folder):
+    files = os.listdir(data_folder)
+    for file in files:
+        if os.path.isfile(data_folder+"/"+file):
+
+            filename, extension = os.path.splitext(file)
+            print("准备解压" + filename + '.zip')
+            if extension == ".zip":
+                zip_ = zipfile.ZipFile(data_folder+'/'+filename + '.zip', 'r')
+                zip_.extractall(data_folder)
+                zip_.close()
+                print('\tdone')
+
+
+
 ########################################################################################################################
 # Main function for data set generation
 ########################################################################################################################
@@ -70,7 +88,7 @@ def download_and_unzip(url, dataset_name, data_folder):
     print('Downloading', dataset_name, 'data set...')
     data_zip = wget.download(url, out=data_folder)
     print('\tunzipping...')
-    zip_ = zipfile.ZipFile(data_zip, 'r')
+    zip_ = zipfile.ZipFile(dataset_name+'.zip', 'r')
     zip_.extractall(data_folder)
     zip_.close()
     print('\tdone')
