@@ -753,7 +753,7 @@ def preprocess(data):
 ########################################################################################################################
 # XFG-building
 ########################################################################################################################
-def get_identifiers_from_line(line):
+def get_identifiers_from_line(line):    # 从语句中提取标识符(本地、全局和标签)
     """
     Extract identifiers (local, global and label) from a statement
     :param line: string: (part of) statement
@@ -929,7 +929,7 @@ def construct_function_dictionary(file):    # 构建一个用于帮助构建上�
             func_name_ = re.match(r'define .* (' + rgx.func_name + ')', line)
             assert func_name_ is not None, "Could not match function name in " + line
             func_name = func_name_.group(1)[1:]  # drop the leading '@'
-            m_loc, m_glob, m_label, m_label2 = get_identifiers_from_line(line)
+            m_loc, m_glob, m_label, m_label2 = get_identifiers_from_line(line)  # 从语句中提取标识符(本地、全局和标签)
             if len(m_loc) > 0:
                 named_args = True
             else:
@@ -1187,7 +1187,7 @@ def add_edge_dummy(G, parent_prefix, parent_node, stmt, ad_hoc_count):
     return ad_hoc_count + 1
 
 
-def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in_file):
+def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in_file): # 将文件中的所有语句添加到图中
     """
     Add all statements from a file to a graph
     :param G: (Multi)Digraph
@@ -1214,7 +1214,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
     func_block_refs = dict()
     stmt_check = ''
 
-    # Loop over the lines in the LLVM IR file
+    # Loop over the lines in the LLVM IR file   逐行处理
     for i, line in enumerate(file):
 
         # Debugging
@@ -1234,7 +1234,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
         # Add nodes and edges according to statement characteristics
 
         ################################################################################################################
-        # Declaration of a global variable
+        # Declaration of a global variable      全局变量的声明
         if re.match(rgx.global_id + r' =' + rgx.linkage + r'* constant ', line) \
                 or re.match(rgx.global_id + r' =' + rgx.linkage + r'* global ', line):
             # (globref) --[stmt]--> (global variable)
@@ -1243,7 +1243,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
             add_edge(G, '', glob_ref, '', globvar, line, 'path')
 
         ################################################################################################################
-        # Function definition
+        # Function definition       函数定义
         elif re.match(r'define .* ' + rgx.func_name + '\(.*\)', line):
             # We are in the body of a new function
             # eg define i32 @main() local_unnamed_addr #0 {
@@ -1254,9 +1254,9 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
             func_name_ = func_name.group(1)[1:]
             func_prefix = functions_defined_in_file[func_name_][0] + '_'
 
-            # update the block reference and add a node corresponding to the block reference
+            # update the block reference and add a node corresponding to the block reference    更新块引用并添加与块引用对应的节点
             if re.match(rgx.start_basic_block, file[i+1]):
-                # check if the next line is a block ref, then let that be the block reference
+                # check if the next line is a block ref, then let that be the block reference   检查下一行是否为块引用，然后将其作为块引用
                 label = re.match(rgx.start_basic_block, file[i+1]).group(1)
                 if label[0] != '%':
                     label = '%' + label
@@ -1275,12 +1275,12 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
             # (globref) --[..define..]--> (block reference)
             add_edge(G, '', glob_ref, '', block_ref, line, 'path')
 
-            # Get list of arguments
+            # Get list of arguments 获取参数列表
             if re.search(rgx.local_id + r'(?!\* )(?=([\s,\)]|$))', line) is not None:
-                # then the arguments are explicitely named
+                # then the arguments are explicitely named  然后显式命名实参
                 arg_nodes = functions_defined_in_file[func_name_][4]
             else:
-                # then the arguments are referred to as %0, %1, etc. though this isn't explicitely stated
+                # then the arguments are referred to as %0, %1, etc. though this isn't explicitely stated   然后参数被称为%0、%1等，尽管这没有明确说明
                 num_args = functions_defined_in_file[func_name_][3]
                 arg_nodes = ['%' + str(i) for i in range(num_args)]
 
@@ -1290,7 +1290,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                 add_edge(G, '', block_ref, func_prefix, a, line, 'path')
 
         ################################################################################################################
-        # Label (i.e., a new basic block)
+        # Label (i.e., a new basic block)   label标记，表示一个新的基本块
         elif re.match(rgx.start_basic_block, line):
             # eg ; <label>:11:                                     ; preds = %8
             # eg .lr.ph.i:
@@ -1314,7 +1314,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
             ids_in_basic_block = list()
 
         ################################################################################################################
-        # Variable assignment (except function calls)
+        # Variable assignment (except function calls) 变量复制类型的LLVM语句
         elif re.match(rgx.local_id + r' = (?!(tail )?(call|invoke) )', line):
 
             # Detect the assignee and add its node
@@ -1395,11 +1395,11 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         add_edge(G, '', m_g, func_prefix, assignee, line, 'data')
 
         ################################################################################################################
-        # Not an assignment:
+        # Not an assignment:    非赋值语句
         else:
 
             ############################################################################################################
-            # store
+            # store 用于存储到内存的指令
             if re.match('store ', line):
                 # eg store float %11, float* %6, align 4
                 m = re.match(r'store (?:volatile )?\{?[\"\:\%\.\,\_\*\d\s\w\<\>]+\}? (' + rgx.immediate_or_local_id +
@@ -1482,19 +1482,19 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                             add_edge(G, '', block_ref, func_prefix, m2, line, 'data')
 
             ############################################################################################################
-            # (indirect) branch
+            # (indirect) branch 分支
             elif re.match('(indirect)?br ', line):
 
-                # Unconditional branch
+                # Unconditional branch  无条件分支
                 if re.match('br label ', line):
 
-                    # Get the label and add node
+                    # Get the label and add node    获取标签并添加节点
                     label_ = re.search(r'label (' + rgx.local_id + r')', line)
                     assert label_ is not None, "Could not identify label in:\n" + line
                     label = label_.group(1)
                     add_node(G, func_prefix, label, 'label', ids_in_basic_block)
 
-                    # Get the sink nodes of this basic block
+                    # Get the sink nodes of this basic block    得到这个基本块的汇聚节点
                     # (sink nodes) --[stmt]--> (label)
                     added_edge = False
                     if len(ids_in_basic_block) > 0:
@@ -1509,7 +1509,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         # there are no local ids in this basic block, connect to the block reference
                         add_edge(G, '', block_ref, func_prefix, label, line, 'ctrl')
 
-                # Conditional branch
+                # Conditional branch    条件分支
                 elif re.match('br i1 ', line):
 
                     # Get all components
@@ -1535,7 +1535,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         add_edge(G, func_prefix, comparator, func_prefix, labelF, line, 'ctrl')
 
                     elif re.match(rgx.immediate_value, comparator) or comparator == 'undef':
-                        # Get the sink nodes of this basic block
+                        # Get the sink nodes of this basic block    基本块汇聚
                         # (sink nodes) --[stmt]--> (label)
                         added_edge = False
                         if len(ids_in_basic_block) > 0:
@@ -1574,7 +1574,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         else:
                             assert False, "Could not identify comparator in:\n" + line + '\nComparator:\n' + comparator
 
-                # Indirect branch
+                # Indirect branch   间接分支
                 elif re.match('indirectbr ', line):
 
                     # eg indirectbr i8* %18, [label %1639, label %754, ..., label %1303, label %1314]
@@ -1631,11 +1631,11 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                     vals.append(m[0])
                     labels.append(m[1])
 
-                # Get the default label and add it to the labels
+                # Get the default label and add it to the labels    default 语句
                 labels.append(deflabel)
 
                 if re.match(rgx.local_id, comparator):
-                    # Treat like an unconditional branch
+                    # Treat like an unconditional branch    按照无条件分支处理
                     sink_nodes = list()
                     if len(ids_in_basic_block) > 0:
                         for n in list(set(ids_in_basic_block)):
@@ -1660,10 +1660,10 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
 
 
             ############################################################################################################
-            # function call
+            # function call 函数调用
             elif re.match(r'(' + rgx.local_id + r' = )?(tail )?(call|invoke) ', line):
 
-                # Get function name
+                # Get function name 获取函数名
                 if ' asm ' in line:
                     if line == '%13 = tail call { %struct.rw_semaphore*, i64 } asm sideeffect "':
                         line = '%13 = tail call { %struct.rw_semaphore*, i64 } asm sideeffect "# beginning down_read\0A\09.pushsection .smp_locks,\22a\22\0A.balign 4\0A.long 671f - .\0A.popsection\0A671:\0A\09lock;  incq ($3)\0A\09  jns        1f\0A  call call_rwsem_down_read_failed\0A1:\0A\09# ending down_read\0A\09", "=*m,={ax},={rsp},{ax},*m,2,~{memory},~{cc},~{dirflag},~{fpsr},~{flags}"(%struct.atomic64_t* %11, %struct.rw_semaphore* %10, %struct.atomic64_t* %11, i64 %12) #4, !srcloc !9'
@@ -1708,9 +1708,9 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         # For next loop
                         s = re.search(r'(\([^\(\)]+\))', arg_list_modif)
 
-                    # We are splitting arg_list_modif into arguments at every 'valid' comma.
-                    # and store the result in list `to_match`
-                    # to this end, replace all non 'valid' commata.
+                    # We are splitting arg_list_modif into arguments at every 'valid' comma.    根据逗号对函数参数做分隔
+                    # and store the result in list `to_match`   并将结果存储在列表' to_match '中
+                    # to this end, replace all non 'valid' commata. 为此，替换所有非“有效”的逗号
                     open_qts = False
                     open_par = 0
                     for i, c in enumerate(arg_list_modif):
@@ -1735,8 +1735,8 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                                                       " (args: " + arg_list + ", expected " + str(num_args) + \
                                                       " arguments."
 
-                    # Get all individual arguments (can contain immediates!)
-                    # (these are the called arguments, not the defined ones!)
+                    # Get all individual arguments (can contain immediates!)    获取所有单独的参数
+                    # (these are the called arguments, not the defined ones!)   这些是被调用的参数，而不是定义的参数!
                     args = list()
                     try:
                         for t in to_match:
@@ -1762,20 +1762,20 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                                 raise ValueError('FunctionNotSupported') 
                     except ValueError: 
                         raise
-
+                # 如果这个函数在这个文件中定义，获取被调用函数的缩写名称
                 if func_name[1:] in functions_defined_in_file.keys():
-                    # if this function is defined in this file
+                    # if this function is defined in this file  如果这个函数在这个文件中定义
 
-                    # Get the called function's shortened name
+                    # Get the called function's shortened name  获取被调用函数的缩写名称
                     func_key = func_name[1:]
                     called_func = functions_defined_in_file[func_key][0]
 
-                    # Get the list of defined (*NOT* called!) arguments
+                    # Get the list of defined (*NOT* called!) arguments 获取已定义(不是调用的!)参数的列表
                     if len(functions_defined_in_file[func_key]) == 5:
-                        # Arguments are named explicitely
+                        # Arguments are named explicitely   参数是显式命名的
                         args_defined = functions_defined_in_file[func_key][4]
                     else:
-                        # Arguments are named implicitely
+                        # Arguments are named implicitely   参数是隐式命名的
                         args_defined = ['%' + str(i) for i in range(0, num_args)]
 
                     # Connect called->defined arguments
@@ -1857,6 +1857,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                         add_edge(G, called_func + '_', ret, func_prefix, m_label[0], line, 'ctrl')
                         add_edge(G, called_func + '_', ret, func_prefix, m_label[1], line, 'ctrl')
 
+                # 函数不在本文件定义的情况
                 else:
                     # if this function is *NOT* defined in this file (i.e. we don't know its body)
                     # - only declared in this file
@@ -1864,7 +1865,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                     # - function pointer
                     # - intrinsic
 
-                    # Connect arguments
+                    #  Connect arguments
                     no_parent = True
                     a_connected = ''
                     if assignee is None:
@@ -1935,7 +1936,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
                             add_edge(G, func_prefix, assignee, func_prefix, m_label[1], line, 'ctrl')
 
             ############################################################################################################
-            # return statement
+            # return statement  函数体内返回语句
             elif re.match('ret ', line):
 
                 # Identify the returned value and get a node for it if needed
@@ -1991,7 +1992,7 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
 
 
             ############################################################################################################
-            # return statement
+            # return statement  返回语句
             elif re.match('resume ', line):
 
                 # Get the identifier
@@ -2031,11 +2032,11 @@ def add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in
             func_prefix = v[0] + '_'
             if (func_prefix + '#top_ref') in list(G.nodes()):
                 G = nx.contracted_nodes(G, func_block_refs[func_prefix], func_prefix + '#top_ref', False)
-
+    nx.draw(G)
     return G
 
 
-def check_vocabulary_size(preprocessed_file, G):
+def check_vocabulary_size(preprocessed_file, G):    # 确保图表表示中的词汇量大小与文本表示中的词汇量大小相匹配
     """
     Make sure the vocabulary size in the graph representation matches the one in the text representation
     :param preprocessed_file: list of statements contained in the preprocessed file
@@ -2083,13 +2084,13 @@ def check_vocabulary_size(preprocessed_file, G):
 
 def check_graph_construction(G, filename):
     """
-    Assess the validity of the construction of this graph using following criteria:
-    - Does every node have an ID?
-    - Have all statements been added to the graph?
-    - Are there any isolated nodes?
-    - Are there any global nodes which are leaf nodes (i.e. are not re-used)
-    - Make a list of multi-edges
-    - Make sure the graph is connected
+    Assess the validity of the construction of this graph using following criteria: 使用以下标准来评估此图结构的有效性
+    - Does every node have an ID?   是否每个节点都有ID
+    - Have all statements been added to the graph?  是否每个节点都加入图中
+    - Are there any isolated nodes? 是否存在孤立的节点
+    - Are there any global nodes which are leaf nodes (i.e. are not re-used)    是否存在叶子节点的全局节点
+    - Make a list of multi-edges    制作一个多边列表
+    - Make sure the graph is connected  确保图形是连接的
     :param G: context graph to be checked
     :param filename: name of file
     :return: multi-edges: list of edges for which parallel edges exist
@@ -2191,15 +2192,15 @@ def build_graph(file, functions_declared_in_file, filename):    #给定一个源
         # Dictionary of functions defined in the file
         # keys: names of functions which are defined (not just declared) in this file
         # values: pair: [shortened function name, its corresponding return statement]
-        functions_defined_in_file = construct_function_dictionary(file)
+        functions_defined_in_file = construct_function_dictionary(file)     # 构建一个用于帮助构建上下文图的函数字典
     
-        # Add lines to graph
+        # Add lines to graph 构建图
         G = add_stmts_to_graph(G, file, functions_defined_in_file, functions_declared_in_file)
 
-        # Make sure the vocabulary size in the graph representation matches the one in the text representation
+        # Make sure the vocabulary size in the graph representation matches the one in the text representation  确保图表表示中的词汇量大小与文本表示中的词汇量大小相匹配
         check_vocabulary_size(file, G)
 
-        # Make sure the graph was correctly constructed
+        # Make sure the graph was correctly constructed 确保图表构造正确
         multi_edges, G = check_graph_construction(G, filename)
 
     except ValueError:
@@ -2210,11 +2211,11 @@ def build_graph(file, functions_declared_in_file, filename):    #给定一个源
 
 def get_data_characteristics(data_folders):
     """
-    Get data characteristics
+    Get data characteristics    获取数据特征
     :param data_folders: data folders
     :return: boolean
     """
-    # Determine whether the data set uses structure names with a pattern ('%"[^"]*") different from local identifiers
+    # Determine whether the data set uses structure names with a pattern ('%"[^"]*") different from local identifiers   确定数据集是否使用模式('%"[^"]*")不同于本地标识符的结构名
     specific_struct_name_pattern = False
     for folder in data_folders:
         if folder in ['data/testing/ll_1', 'data/testing/ll_2', 'data/testing/ll_20',
@@ -2448,7 +2449,7 @@ def inline_struct_types_in_file(G, dic, specific_struct_name_pattern):
     return G
 
 
-def inline_struct_types(G, data_with_struct_def, file_name, specific_struct_name_pattern):
+def inline_struct_types(G, data_with_struct_def, file_name, specific_struct_name_pattern):  # 源代码转换:内联结构类型
     """
     :param G: graph of statements
     :param data_with_struct_def: list of statements containing the structure definitions
@@ -2824,7 +2825,7 @@ def construct_xfg_single_raw_folder(params, num_folder):
 
                 # Construct graph
                 try:
-                    G, multi_edges = build_graph(preprocessed_file, functions_declared_in_files[i], file_names[i])
+                    G, multi_edges = build_graph(preprocessed_file, functions_declared_in_files[i], file_names[i])  # 构造图
                 except ValueError:
                     continue
                 except AssertionError as e:
@@ -2843,27 +2844,27 @@ def construct_xfg_single_raw_folder(params, num_folder):
                     continue
 
                 # Print data to external file
-                print_graph_to_file(G, multi_edges, graph_folder, file_name)
+                print_graph_to_file(G, multi_edges, graph_folder, file_name)    # 存储图到文件
 
                 ####################################################################################################
-                # XFG transformations (inline structures and abstract statements)
+                # XFG transformations (inline structures and abstract statements)   XFG转换(内联结构和抽象语句)
 
-                # Determine whether the data set has a specific structure pattern or not
+                # Determine whether the data set has a specific structure pattern or not    确定数据集是否具有特定的结构模式
                 specific_struct_name_pattern = get_data_characteristics(folder_raw)
                 if specific_struct_name_pattern:
-                    rgx.struct_name = '%"[^"]*"'    # Adjust structure names in accordance
+                    rgx.struct_name = '%"[^"]*"'    # Adjust structure names in accordance  相应地调整结构名称
 
-                # Source code transformation: inline structure types
+                # Source code transformation: inline structure types    源代码转换:内联结构类型
                 G, structures_dictionary = inline_struct_types(G, preprocessed_data_with_structure_def[i],
                                                                 file_name, specific_struct_name_pattern)
 
-                # Print structures dictionary
+                # Print structures dictionary   输出结构字典
                 print_structure_dictionary(structures_dictionary, structures_folder, file_name)
 
-                # Source code transformation: abstract statement
+                # Source code transformation: abstract statement    源代码转换:抽象语句
                 G = abstract_statements_from_identifiers(G)
 
-                # Save G to file
+                # Save G to file    保存图到文件
                 i2v_utils.safe_pickle(G, os.path.join(graph_folder, file_name[:-3] + '_xfg.p'))
 
                 # Dump list of statements to be used in construct_vocabulary
@@ -2896,7 +2897,7 @@ def construct_xfg_single_raw_folder(params, num_folder):
                 print('--- Found dual-xfg for file : ', file_name, ', skipping...')
 
         ############################################################################################################
-        # Write file indicating that the folder has been preprocessed
+        # Write file indicating that the folder has been preprocessed   写入文件，指示文件夹已被预处理
         f = open(data_preprocessing_done_filename, 'w')
         f.close()
         if os.path.exists(data_preprocessing_broken_filename):
